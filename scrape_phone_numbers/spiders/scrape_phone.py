@@ -37,9 +37,9 @@ class ScrapePhoneSpider(scrapy.Spider):
         numitems = []
 
         selector = response.xpath('string(//body/*[not(self::script) and not(self::style)])').extract()  # returns a list
-        sanitized = ''.join([re.sub(r'[^a-zA-Z\d+]+', '', item) for item in selector])  # remove alphanumeric characters, making a list comprehension
+        sanitized = ''.join([re.sub(r'[^a-zA-Z\d+\-]+', '', item) for item in selector])  # remove alphanumeric characters, making a list comprehension
 
-        pattern = re.compile('[\d+]{9,12}')
+        pattern = re.compile('[\d+\-]{9,12}')
         numbers = pattern.findall(sanitized)
         v = set(numbers)
         for number in zip(v):
