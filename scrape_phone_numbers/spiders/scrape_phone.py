@@ -6,16 +6,15 @@ from scrapy.spidermiddlewares.httperror import HttpError
 from twisted.internet.error import DNSLookupError
 from twisted.internet.error import TimeoutError
 
-from scrape_phone_numbers.items import ScrapePhoneNumbersItem
+
+class ScrapePhoneNumbersItem(scrapy.Item):
+    phone = scrapy.Field()
+    source = scrapy.Field()
 
 
 class ScrapePhoneSpider(scrapy.Spider):
 
     name = 'scrape_phone'
-    f = open('urls_to_scrape_full_urls.csv')
-    start_urls = [url.strip() for url in f.readlines()]
-    allowed_domains = [start_urls]
-    f.close()
 
     bad_url = 'not_working_url.csv'
     dns_error = 'dns_error.csv'
@@ -27,8 +26,9 @@ class ScrapePhoneSpider(scrapy.Spider):
     timeout_error = 'timeout.csv'
 
     def start_requests(self):
-        for u in self.start_urls:
-            yield scrapy.Request(u, callback=self.parse_httpbin, errback=self.errback_httpbin, dont_filter=True)
+        with open('urls_to_scrape_full_urls.csv','r') as read_file:
+            for u in read_file.readlines():
+                yield scrapy.Request(u.strip(), callback=self.parse_httpbin, errback=self.errback_httpbin, dont_filter=True)
 
     def parse_httpbin(self, response):
 
@@ -36,18 +36,37 @@ class ScrapePhoneSpider(scrapy.Spider):
 
         numitems = []
 
-        selector = response.xpath('string(//body/*[not(self::script) and not(self::style)])').extract()  # returns a list
-        sanitized = ''.join([re.sub(r'[^a-zA-Z\d+\-]+', '', item) for item in selector])  # remove alphanumeric characters, making a list comprehension
+        self.removeNode(response.selector, response.xpath('//style'))
+        self.removeNode(response.selector, response.xpath('//script'))
+
+        print('BODY', response.body)
+        selector = response.xpath('string(//body)').extract()  # returns a list
+        print('PARSED BODY', selector)
+        sanitized = ''.join([re.sub(r'[^\+a-zA-Z\d+\-]+', '', item) for item in selector])  # remove alphanumeric characters, making a list comprehension
+        print('SANITIZED BODY',sanitized)
 
         pattern = re.compile('[\d+\-]{9,12}')
+
         numbers = pattern.findall(sanitized)
+        print('SCRAPED NUMBERS',numbers)
+
         v = set(numbers)
         for number in zip(v):
             numitem = ScrapePhoneNumbersItem()
             numitem['phone'] = number
             numitem['source'] = response.url
             numitems.append(numitem)
-            return numitems
+
+        return numitems
+
+            # yield {'number':number, 'url':response.url}
+
+    def removeNode(self, context, nodeToRemove):
+        for element in nodeToRemove:
+            contentToRemove = element.root # .root returns a html element
+            contentToRemove.getparent().remove(contentToRemove) # .getparent() gets parent element of style/script, then removes it
+
+        return context.extract()
 
     def handle_status_codes(self, response):
 
