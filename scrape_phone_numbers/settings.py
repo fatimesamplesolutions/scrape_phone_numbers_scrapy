@@ -25,8 +25,8 @@ ROBOTSTXT_OBEY = False
 CONCURRENT_REQUESTS = 32
 
 # Configure a delay for requests for the same website (default: 0)
-# See https://doc.scrapy.org/en/latest/topics/settings.html#download-delay
-# See also autothrottle settings and docs
+# See https://doc.scrapy.
+#  See also autothrottle settings and docs
 DOWNLOAD_DELAY = 5
 # The download delay setting will honor only one of:
 CONCURRENT_REQUESTS_PER_DOMAIN = 16
@@ -34,6 +34,11 @@ CONCURRENT_REQUESTS_PER_IP = 16
 
 DOWNLOAD_TIMEOUT =5
 RETRY_TIMES = 2
+
+DEPTH_LIMIT = 1
+DEPTH_PRIORITY = 1
+SCHEDULER_DISK_QUEUE = 'scrapy.squeues.PickleFifoDiskQueue'
+SCHEDULER_MEMORY_QUEUE = 'scrapy.squeues.FifoMemoryQueue'
 # Disable cookies (enabled by default)
 #COOKIES_ENABLED = False
 
