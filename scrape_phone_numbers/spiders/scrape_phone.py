@@ -31,10 +31,10 @@ class ScrapePhoneSpider(CrawlSpider):
     timeout_error = 'timeout.csv'
     allowed_domains = []
 
-    phoneLabelPatterns = [r'\bM\b', r'\bT\b', r'tel', r'phone', r'Tel']
+    phoneLabelPatterns = [r'\bM\b', r'\bT\b', r'tel', r'phone', r'Tel', r'Spoedlijn']
     regexPhoneLabelPatterns = [re.compile(label) for label in phoneLabelPatterns]
 
-    phoneFormatPatterns = [r'[\d]{3}[\s]+-?[\s]+[\d]{2}[\s]+[\d]{2}[\s]+[\d]{3}',r'\+?[\d+\-]{9,13}']
+    phoneFormatPatterns = [r'[\d]{3}[\s]+-?[\s]+[\d]{2}[\s]+[\d]{2}[\s]+[\d]{3}']
     regexPhoneFormatPatterns = [re.compile(label) for label in phoneFormatPatterns]
 
     def start_requests(self):
@@ -64,35 +64,6 @@ class ScrapePhoneSpider(CrawlSpider):
              numitems.append(numitem)
 
         return numitems
-
-
-
-        # numitems = []
-        #
-        # self.removeNode(response.selector, response.xpath('//style'))
-        # self.removeNode(response.selector, response.xpath('//script'))
-        #
-        # print('BODY', response.body)
-        # selector = response.xpath('string(//body)').extract()  # returns a list
-        # print('PARSED BODY', selector)
-        # sanitized = ''.join([re.sub(r'[^\+a-zA-Z\d+\-]+', '', item) for item in selector])  # remove alphanumeric characters, making a list comprehension
-        # print('SANITIZED BODY',sanitized)
-        #
-        # pattern = re.compile('[\d+\-]{9,12}')
-        #
-        # numbers = pattern.findall(sanitized)
-        # print('SCRAPED NUMBERS',numbers)
-        #
-        # v = set(numbers)
-        # for number in zip(v):
-        #     numitem = ScrapePhoneNumbersItem()
-        #     numitem['phone'] = number
-        #     numitem['source'] = response.url
-        #     numitems.append(numitem)
-        #
-        # return numitems
-
-            # yield {'number':number, 'url':response.url}
 
     def removeNode(self, context, nodeToRemove):
         for element in nodeToRemove:
@@ -156,8 +127,6 @@ class ScrapePhoneSpider(CrawlSpider):
         file.write(string + "\n")
         file.close()
 
-
-
     def anyMatch(self, str):
         for pattern in self.regexPhoneLabelPatterns:
             if (len(pattern.findall(str)) > 0):
@@ -165,8 +134,11 @@ class ScrapePhoneSpider(CrawlSpider):
         return False
 
     def tagMatchingCondition(self, tag):
+        # <div> div text <span> nested span text </span> </div> => div text, not div text nested span text
         tagText = ''.join([content for content in tag.contents if isinstance(content, str)])
-        matchesClassName = self.anyMatch(','.join(tag.get('class', [])))
+        # <div class=' fa fa-phone'></div> => classes='fa,fa-phone'
+        classes = ','.join(tag.get('class', []))
+        matchesClassName = self.anyMatch(classes)
         matchesText = self.anyMatch(tagText)
         matchesHref = self.anyMatch(tag.get('href', ''))
         return tag and tag.name != 'script' and tag.name != 'style' and (matchesClassName or matchesText or matchesHref)
@@ -189,6 +161,7 @@ class ScrapePhoneSpider(CrawlSpider):
         print(allNumbers)
         return allNumbers
 
+    # <tr><td></td> <td></td> <td></td> </tr>
     def findNumberInSiblings(self, tag):
         nextSibling = tag.nextSibling
         nextSiblingsNumbers = []
@@ -205,6 +178,7 @@ class ScrapePhoneSpider(CrawlSpider):
 
         return nextSiblingsNumbers + previousSiblingNumbers
 
+    #  <div> hello <div> world<div> you are great</div>
     def findNumberInTag(self, tag):
         textToTest = []
         if hasattr(tag, 'text'):
@@ -212,12 +186,16 @@ class ScrapePhoneSpider(CrawlSpider):
         elif isinstance(tag, str):
             textToTest.append(tag)
 
+        #  <a href="tel:+12312312"> +123 123 321 </a>
         if tag.name == 'a':
             textToTest.append(tag.get('href', ''))
-
+        # remove unicode \x0a etc
         normalized = [unicodedata2.normalize("NFKD", text) for text in textToTest]
 
+        # [['+123', '123], ['33', '222']] => ['+123', '123', '33','222']
+        # flatten nested list
+        # sum method takes every element and sums to each other
+        # ['+123', '123] +  ['33', '222'] + [] =>  ['+123', '123', '33','222']
         numbers = sum([pattern.findall('.'.join(normalized)) for pattern in self.regexPhoneFormatPatterns], [])
 
         return numbers
-        # match phone number regexes in normalized string and push results to number
