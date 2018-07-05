@@ -31,10 +31,10 @@ class ScrapePhoneSpider(CrawlSpider):
     timeout_error = 'timeout.csv'
     allowed_domains = []
 
-    phoneLabelPatterns = [r'\bM\b', r'\bT\b', r'tel', r'phone', r'Tel', r'Spoedlijn']
+    phoneLabelPatterns = [r'\bM\b', r'\bT\b', r'tel', r'phone', r'Tel', r'Spoedlijn', r'email']
     regexPhoneLabelPatterns = [re.compile(label) for label in phoneLabelPatterns]
 
-    phoneFormatPatterns = [r'[\d]{3}[\s]+-?[\s]+[\d]{2}[\s]+[\d]{2}[\s]+[\d]{3}']
+    phoneFormatPatterns = [r'[\d]{3}[\s]+-?[\s]+[\d]{2}[\s]+[\d]{2}[\s]+[\d]{3}', r'(\+?\d{2}\s*\(?\d?\)?\d{3}[\/\s]?\d{2}[\s\.]?\d{2}[\s\.]?\d{2}|\d{3}[\/\s]?\d{2}[\s\.]?\d{2}[\s\.]?\d{2})']
     regexPhoneFormatPatterns = [re.compile(label) for label in phoneFormatPatterns]
 
     def start_requests(self):
@@ -199,3 +199,4 @@ class ScrapePhoneSpider(CrawlSpider):
         numbers = sum([pattern.findall('.'.join(normalized)) for pattern in self.regexPhoneFormatPatterns], [])
 
         return numbers
+        # match phone number regexes in normalized string and push results to number
