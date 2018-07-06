@@ -31,10 +31,10 @@ class ScrapePhoneSpider(CrawlSpider):
     timeout_error = 'timeout.csv'
     allowed_domains = []
 
-    phoneLabelPatterns = [r'\bM\b', r'\bT\b', r'tel', r'phone', r'Tel', r'Spoedlijn', r'email']
+    phoneLabelPatterns = [r'\bM\b', r'\bT\b', r'\btel\b', r'\bphone\b', r'Tel', r'Spoedlijn', r'email']
     regexPhoneLabelPatterns = [re.compile(label) for label in phoneLabelPatterns]
 
-    phoneFormatPatterns = [r'[\d]{3}[\s]+-?[\s]+[\d]{2}[\s]+[\d]{2}[\s]+[\d]{3}', r'(\+?\d{2}\s*\(?\d?\)?\d{3}[\/\s]?\d{2}[\s\.]?\d{2}[\s\.]?\d{2}|\d{3}[\/\s]?\d{2}[\s\.]?\d{2}[\s\.]?\d{2})']
+    phoneFormatPatterns = [r'\b[\d]{3}[\s]+-?[\s]+[\d]{2}[\s]+[\d]{2}[\s]+[\d]{3}\b', r'(\+?\b\d{2}\s*\(?\d?\)?\d{3}[\/\s]?\d{2}[\s\.]?\d{2}[\s\.]?\d{2}\b|\b\d{3}[\/\s]?\d{2}[\s\.]?\d{2}[\s\.]?\d{2}\b)']
     regexPhoneFormatPatterns = [re.compile(label) for label in phoneFormatPatterns]
 
     def start_requests(self):
