@@ -4,6 +4,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from scrapy.spidermiddlewares.httperror import HttpError
+from scrapy.utils.url import parse_url
 from twisted.internet.error import DNSLookupError
 from twisted.internet.error import TimeoutError
 import unicodedata2
@@ -15,6 +16,7 @@ from scrapy.linkextractors import LinkExtractor
 class ScrapePhoneNumbersItem(scrapy.Item):
     phone = scrapy.Field()
     source = scrapy.Field()
+    email = scrapy.Field()
 
 
 class ScrapePhoneSpider(CrawlSpider):
@@ -34,17 +36,28 @@ class ScrapePhoneSpider(CrawlSpider):
     phoneLabelPatterns = [r'\bM\b', r'\bT\b', r'\btel\b', r'\bphone\b', r'Tel', r'Spoedlijn', r'email']
     regexPhoneLabelPatterns = [re.compile(label) for label in phoneLabelPatterns]
 
-    phoneFormatPatterns = [r'\b[\d]{3}[\s]+-?[\s]+[\d]{2}[\s]+[\d]{2}[\s]+[\d]{3}\b', r'(\+?\b\d{2}\s*\(?\d?\)?\d{3}[\/\s]?\d{2}[\s\.]?\d{2}[\s\.]?\d{2}\b|\b\d{3}[\/\s]?\d{2}[\s\.]?\d{2}[\s\.]?\d{2}\b)']
+    phoneFormatPatterns = [r'\b[\d]{3}[\s]+-?[\s]+[\d]{2}[\s]+[\d]{2}[\s]+[\d]{3}\b',
+                           r'(\+?\b\d{2}\s*\(?\d?\)?\d{3}[\/\s]?\d{2}[\s\.]?\d{2}[\s\.]?\d{2}\b|\b\d{3}[\/\s]?\d{2}[\s\.]?\d{2}[\s\.]?\d{2}\b)',
+                           r'\b\d{2}[\/\s]\d{2,3}[\.|\s]\d{2,3}[\.|\s]\d{2,3}\b',
+                           r'\+?\b[\d]{3}[\s]?[\d]{4}[\s]?[\d]{4}\b',
+                           r'\+?\b[\d]{2}[\s]?[\d]?[\s]?[\d]{3}[\s]?[\d]{2,3}[\s]?[\d]{2}\b',
+                           r'\b[\d]{2,4}[\s][\-][\s][\d]{6,7}\b']
     regexPhoneFormatPatterns = [re.compile(label) for label in phoneFormatPatterns]
+
+    extractor = LinkExtractor(allow=(r'.*'), allow_domains=allowed_domains)
 
     def start_requests(self):
         with open('urls_to_scrape_full_urls.csv','r') as read_file:
             for u in read_file.readlines():
-                self.allowed_domains.append(u.strip())
+                host = parse_url(u.strip()).netloc.lower()
+                if not host:
+                    continue
+                self.allowed_domains.append(host)
+                self.extractor.allow_domains.add(host)
                 yield scrapy.Request(u.strip(), callback=self.parse, errback=self.errback_httpbin, dont_filter=True)
-    rules = (
 
-        Rule(LinkExtractor(allow=(r'.*')), callback='parse_item', follow=True),
+    rules = (
+        Rule(extractor, callback='parse_item', follow=True),
     )
 
     def parse_item(self, response):
@@ -55,15 +68,30 @@ class ScrapePhoneSpider(CrawlSpider):
 
         self.handle_status_codes(response)
 
-        numitems = []
-        v =  self.handle_with_beautifulsoup(response)
-        for number in zip(v):
-             numitem = ScrapePhoneNumbersItem()
-             numitem['phone'] = number
-             numitem['source'] = response.url
-             numitems.append(numitem)
+        numbers = self.handle_with_beautifulsoup(response)
+        emails = self.find_emails(response)
 
-        return numitems
+
+        if (not numbers or len(numbers) == 0) and (not emails or len(emails) == 0):
+             return []
+
+        item = ScrapePhoneNumbersItem()
+        item['phone'] = ','.join(numbers)
+        item['email'] = ','.join(emails)
+        item['source'] = response.url
+
+        return [item]
+
+    def find_emails(self,response):
+        if response:
+            selector = response.xpath('//body//*[not(self::script) and not(self::style)]').extract()
+            sanitized = ''.join([re.sub(r'^\s+', '', item) for item in selector])
+            pattern = re.compile('([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)')
+            emails = pattern.findall(sanitized)
+            emails_set = set(emails)
+
+            return emails_set
+
 
     def removeNode(self, context, nodeToRemove):
         for element in nodeToRemove:
